@@ -29,13 +29,34 @@ class ScreenCaptureManager: NSObject, ObservableObject {
         guard !isCapturing else { return }
 
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-        guard let display = content.displays.first else {
+
+        // Find the display that contains the capture rect
+        let targetDisplay = content.displays.first(where: { display in
+            let displayFrame = CGRect(x: Int(display.frame.origin.x),
+                                       y: Int(display.frame.origin.y),
+                                       width: display.width,
+                                       height: display.height)
+            return displayFrame.intersects(rect)
+        }) ?? content.displays.first
+
+        guard let display = targetDisplay else {
             throw CaptureError.noDisplayFound
         }
         currentDisplay = display
-        captureRect = rect
         currentFPS = fps
         isAudioEnabled = audio
+
+        // Convert from NSScreen (bottom-left origin) to CG (top-left origin) coordinates
+        // and make relative to the display's frame
+        let displayFrame = display.frame
+        let relativeX = rect.origin.x - displayFrame.origin.x
+        let relativeY = displayFrame.height - (rect.origin.y - displayFrame.origin.y) - rect.height
+        let cgRect = CGRect(x: relativeX, y: relativeY, width: rect.width, height: rect.height)
+        captureRect = cgRect
+
+        ssLog("Display: \(display.width)x\(display.height) at \(displayFrame.origin)")
+        ssLog("Input rect (NSScreen): \(rect)")
+        ssLog("Converted rect (CG): \(cgRect)")
 
         // Exclude our own app from capture
         let excludedApps = content.applications.filter {
@@ -47,7 +68,7 @@ class ScreenCaptureManager: NSObject, ObservableObject {
             exceptingWindows: []
         )
 
-        let config = makeConfig(rect: rect, fps: fps, audio: audio)
+        let config = makeConfig(rect: cgRect, fps: fps, audio: audio)
 
         let frameHandler = onFrameReceived
         let output = StreamOutput { surface in
@@ -76,10 +97,15 @@ class ScreenCaptureManager: NSObject, ObservableObject {
     }
 
     /// Updates the capture region without restarting.
+    /// Input rect is in NSScreen coordinates (bottom-left origin).
     func updateCaptureRect(_ newRect: CGRect) async throws {
-        guard isCapturing, let stream = stream else { return }
-        captureRect = newRect
-        let config = makeConfig(rect: newRect, fps: currentFPS, audio: isAudioEnabled)
+        guard isCapturing, let stream = stream, let display = currentDisplay else { return }
+        let displayFrame = display.frame
+        let relativeX = newRect.origin.x - displayFrame.origin.x
+        let relativeY = displayFrame.height - (newRect.origin.y - displayFrame.origin.y) - newRect.height
+        let cgRect = CGRect(x: relativeX, y: relativeY, width: newRect.width, height: newRect.height)
+        captureRect = cgRect
+        let config = makeConfig(rect: cgRect, fps: currentFPS, audio: isAudioEnabled)
         try await stream.updateConfiguration(config)
     }
 

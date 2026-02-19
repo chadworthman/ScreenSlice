@@ -6,6 +6,8 @@ import CGVirtualDisplayPrivate
 class VirtualDisplayManager: ObservableObject {
     @Published private(set) var isActive = false
     @Published private(set) var displayID: CGDirectDisplayID = 0
+    private(set) var currentWidth: Int = 0
+    private(set) var currentHeight: Int = 0
 
     private var virtualDisplay: CGVirtualDisplay?
     private var renderWindow: NSWindow?
@@ -39,6 +41,8 @@ class VirtualDisplayManager: ObservableObject {
 
         self.virtualDisplay = display
         self.displayID = display.displayID
+        self.currentWidth = width
+        self.currentHeight = height
         self.isActive = true
 
         // Give macOS a moment to register the display, then create the render window
@@ -54,10 +58,12 @@ class VirtualDisplayManager: ObservableObject {
 
     /// Tears down the virtual display and render window.
     func tearDown() {
-        renderWindow?.close()
+        renderWindow?.orderOut(nil)
         renderWindow = nil
         renderView = nil
         virtualDisplay = nil
+        currentWidth = 0
+        currentHeight = 0
         isActive = false
         displayID = 0
     }
@@ -86,12 +92,13 @@ class VirtualDisplayManager: ObservableObject {
             contentRect: screen.frame,
             styleMask: [.borderless],
             backing: .buffered,
-            defer: false,
-            screen: screen
+            defer: false
         )
+        window.setFrame(screen.frame, display: false)
         window.level = .normal
         window.backgroundColor = .black
         window.isOpaque = true
+        window.animationBehavior = .none
         window.collectionBehavior = [.canJoinAllSpaces]
 
         let view = NSView(frame: screen.frame)

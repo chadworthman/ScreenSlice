@@ -26,6 +26,9 @@ class OverlayContentView: NSView {
 
     private let handleSize: CGFloat = 8.0
     private let borderWidth: CGFloat = 2.0
+    private let dragBarWidth: CGFloat = 60.0
+    private let dragBarHeight: CGFloat = 8.0
+    private let dragBarOffset: CGFloat = 16.0 // distance from top edge into the clear region
 
     private enum Interaction {
         case none, move
@@ -93,6 +96,15 @@ class OverlayContentView: NSView {
             NSColor.white.setFill()
             handlePath.fill()
         }
+
+        // Drag handle bar (centered pill at top of clear region)
+        let barRect = dragBarRect()
+        let barPath = NSBezierPath(roundedRect: barRect, xRadius: dragBarHeight / 2, yRadius: dragBarHeight / 2)
+        NSColor.black.withAlphaComponent(0.5).setStroke()
+        barPath.lineWidth = 1.5
+        barPath.stroke()
+        NSColor.white.withAlphaComponent(0.9).setFill()
+        barPath.fill()
     }
 
     // MARK: - Handle Geometry
@@ -113,6 +125,16 @@ class OverlayContentView: NSView {
         ]
     }
 
+    private func dragBarRect() -> NSRect {
+        let r = clearRegion
+        return NSRect(
+            x: r.midX - dragBarWidth / 2,
+            y: r.maxY - dragBarOffset - dragBarHeight / 2,
+            width: dragBarWidth,
+            height: dragBarHeight
+        )
+    }
+
     private func interactionAt(_ point: NSPoint) -> Interaction {
         let tol: CGFloat = 12.0
         let r = clearRegion
@@ -129,7 +151,11 @@ class OverlayContentView: NSView {
         if abs(point.x - r.minX) < tol && point.y > r.minY && point.y < r.maxY { return .resizeLeft }
         if abs(point.x - r.maxX) < tol && point.y > r.minY && point.y < r.maxY { return .resizeRight }
 
-        // Inside = move via border region
+        // Drag bar (centered pill at top) — move handle
+        let bar = dragBarRect().insetBy(dx: -6, dy: -6) // generous hit area
+        if bar.contains(point) { return .move }
+
+        // Border region — also move
         let inner = r.insetBy(dx: tol, dy: tol)
         if r.contains(point) && !inner.contains(point) { return .move }
 

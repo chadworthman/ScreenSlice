@@ -12,6 +12,7 @@ class MenuBarController {
     var onAspectRatioChanged: ((CGFloat) -> Void)?
     var onAudioToggled: ((Bool) -> Void)?
     var onDimOpacityChanged: ((CGFloat) -> Void)?
+    var onCheckPermissions: (() -> Void)?
     var onQuit: (() -> Void)?
 
     private var isSharing = false
@@ -70,6 +71,13 @@ class MenuBarController {
 
         menu.addItem(NSMenuItem.separator())
 
+        // Check Permissions
+        let perms = NSMenuItem(title: "Check Permissions", action: #selector(checkPermissions), keyEquivalent: "p")
+        perms.target = self
+        menu.addItem(perms)
+
+        menu.addItem(NSMenuItem.separator())
+
         // Quit
         let quit = NSMenuItem(title: "Quit ScreenSlice", action: #selector(quitApp), keyEquivalent: "q")
         quit.target = self
@@ -99,6 +107,10 @@ class MenuBarController {
         isAudioOn.toggle()
         audioItem?.state = isAudioOn ? .on : .off
         onAudioToggled?(isAudioOn)
+    }
+
+    @objc private func checkPermissions() {
+        onCheckPermissions?()
     }
 
     @objc private func quitApp() {
