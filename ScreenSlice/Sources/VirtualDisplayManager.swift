@@ -54,6 +54,9 @@ class VirtualDisplayManager: ObservableObject {
     /// Renders an IOSurface frame to the virtual display's render window.
     func renderFrame(_ surface: IOSurface) {
         renderView?.layer?.contents = surface
+        if let window = renderWindow, window.alphaValue == 0 {
+            window.alphaValue = 1
+        }
     }
 
     /// Tears down the virtual display and render window.
@@ -68,9 +71,50 @@ class VirtualDisplayManager: ObservableObject {
         displayID = 0
     }
 
-    /// Updates the virtual display resolution (tears down and recreates).
+    /// Updates the virtual display resolution, keeping the old window visible
+    /// during the transition to prevent a flash.
     func updateResolution(width: Int, height: Int) {
-        createDisplay(width: width, height: height)
+        // Hold onto old window so it stays visible during the 1-second gap
+        let oldWindow = renderWindow
+        let oldDisplay = virtualDisplay
+
+        // Detach without destroying
+        renderWindow = nil
+        renderView = nil
+        virtualDisplay = nil
+
+        // Create new display (skips tearDown since we already detached)
+        let descriptor = CGVirtualDisplayDescriptor()
+        descriptor.setDispatchQueue(DispatchQueue.main)
+        descriptor.name = "ScreenSlice"
+        descriptor.maxPixelsWide = UInt32(width)
+        descriptor.maxPixelsHigh = UInt32(height)
+        descriptor.sizeInMillimeters = CGSize(width: 600, height: 340)
+        descriptor.productID = 0x5C01
+        descriptor.vendorID = 0x5C01
+        descriptor.serialNum = 0x0001
+
+        let display = CGVirtualDisplay(descriptor: descriptor)
+        let settings = CGVirtualDisplaySettings()
+        settings.hiDPI = 0
+        settings.modes = [
+            CGVirtualDisplayMode(width: UInt(width), height: UInt(height), refreshRate: 60),
+            CGVirtualDisplayMode(width: UInt(width), height: UInt(height), refreshRate: 30),
+        ]
+        display.apply(settings)
+
+        self.virtualDisplay = display
+        self.displayID = display.displayID
+        self.currentWidth = width
+        self.currentHeight = height
+        self.isActive = true
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            self?.createRenderWindow()
+            // Now safe to release old window and display
+            oldWindow?.orderOut(nil)
+            _ = oldDisplay
+        }
     }
 
     // MARK: - Private
@@ -100,6 +144,7 @@ class VirtualDisplayManager: ObservableObject {
         window.isOpaque = true
         window.animationBehavior = .none
         window.collectionBehavior = [.canJoinAllSpaces]
+        window.alphaValue = 0 // Hidden until first frame is rendered
 
         let view = NSView(frame: screen.frame)
         view.wantsLayer = true
