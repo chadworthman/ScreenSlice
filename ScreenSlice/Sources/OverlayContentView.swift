@@ -97,14 +97,15 @@ class OverlayContentView: NSView {
             handlePath.fill()
         }
 
-        // Drag handle bar (centered pill at top of clear region)
-        let barRect = dragBarRect()
-        let barPath = NSBezierPath(roundedRect: barRect, xRadius: dragBarHeight / 2, yRadius: dragBarHeight / 2)
-        NSColor.black.withAlphaComponent(0.5).setStroke()
-        barPath.lineWidth = 1.5
-        barPath.stroke()
-        NSColor.white.withAlphaComponent(0.9).setFill()
-        barPath.fill()
+        // Drag handle bars (centered pills at top and bottom of clear region)
+        for barRect in [topDragBarRect(), bottomDragBarRect()] {
+            let barPath = NSBezierPath(roundedRect: barRect, xRadius: dragBarHeight / 2, yRadius: dragBarHeight / 2)
+            NSColor.black.withAlphaComponent(0.5).setStroke()
+            barPath.lineWidth = 1.5
+            barPath.stroke()
+            NSColor.white.withAlphaComponent(0.9).setFill()
+            barPath.fill()
+        }
     }
 
     // MARK: - Handle Geometry
@@ -125,11 +126,21 @@ class OverlayContentView: NSView {
         ]
     }
 
-    private func dragBarRect() -> NSRect {
+    private func topDragBarRect() -> NSRect {
         let r = clearRegion
         return NSRect(
             x: r.midX - dragBarWidth / 2,
             y: r.maxY - dragBarOffset - dragBarHeight / 2,
+            width: dragBarWidth,
+            height: dragBarHeight
+        )
+    }
+
+    private func bottomDragBarRect() -> NSRect {
+        let r = clearRegion
+        return NSRect(
+            x: r.midX - dragBarWidth / 2,
+            y: r.minY + dragBarOffset - dragBarHeight / 2,
             width: dragBarWidth,
             height: dragBarHeight
         )
@@ -151,9 +162,11 @@ class OverlayContentView: NSView {
         if abs(point.x - r.minX) < tol && point.y > r.minY && point.y < r.maxY { return .resizeLeft }
         if abs(point.x - r.maxX) < tol && point.y > r.minY && point.y < r.maxY { return .resizeRight }
 
-        // Drag bar (centered pill at top) — move handle
-        let bar = dragBarRect().insetBy(dx: -6, dy: -6) // generous hit area
-        if bar.contains(point) { return .move }
+        // Drag bars (centered pills at top and bottom) — move handles
+        let topBar = topDragBarRect().insetBy(dx: -6, dy: -6)
+        if topBar.contains(point) { return .move }
+        let bottomBar = bottomDragBarRect().insetBy(dx: -6, dy: -6)
+        if bottomBar.contains(point) { return .move }
 
         // Border region — also move
         let inner = r.insetBy(dx: tol, dy: tol)

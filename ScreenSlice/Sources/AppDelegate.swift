@@ -46,6 +46,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
             self?.changeAspectRatio(ratio)
         }
 
+        menuBar.onDimOpacityChanged = { [weak self] opacity in
+            self?.overlayWindow?.overlayView.dimOpacity = opacity
+        }
+
         menuBar.onAudioToggled = { [weak self] enabled in
             guard let self else { return }
             Task {
@@ -114,9 +118,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         self.overlayWindow = overlay
         ssLog("Overlay shown")
 
-        // 2. Create virtual display at fixed 1920x1080 — created once, never resized
-        ssLog("Creating virtual display 1920x1080...")
-        virtualDisplay.createDisplay(width: 1920, height: 1080)
+        // 2. Create virtual display matching capture aspect ratio
+        let (vw, vh) = displayDimensions(for: currentAspectRatio)
+        ssLog("Creating virtual display \(vw)x\(vh)...")
+        virtualDisplay.createDisplay(width: vw, height: vh)
         ssLog("Virtual display created, displayID=\(virtualDisplay.displayID)")
 
         // 3. Connect frame updates from overlay to capture manager
@@ -125,6 +130,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
             guard let self else { return }
             Task {
                 try? await self.captureManager.updateCaptureRect(newRegion)
+            }
+        }
+
+        // On mouse-up: recreate virtual display if aspect ratio changed
+        overlay.overlayView.onRegionFinished = { [weak self] finalRegion in
+            guard let self else { return }
+            let regionRatio = finalRegion.width / finalRegion.height
+            let (vw, vh) = self.displayDimensions(for: regionRatio)
+            if vw != self.virtualDisplay.currentWidth || vh != self.virtualDisplay.currentHeight {
+                ssLog("Region finished — updating virtual display to \(vw)x\(vh)")
+                self.virtualDisplay.updateResolution(width: vw, height: vh)
             }
         }
 
@@ -183,6 +199,29 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
             region.origin.y = centerY - region.height / 2
             overlay.overlayView.clearRegion = region
             overlay.overlayView.onRegionChanged?(region)
+        }
+
+        // Recreate virtual display to match new aspect ratio
+        if virtualDisplay.isActive {
+            let (vw, vh) = displayDimensions(for: ratio)
+            ssLog("Aspect ratio changed — updating virtual display to \(vw)x\(vh)")
+            virtualDisplay.updateResolution(width: vw, height: vh)
+        }
+    }
+
+    /// Computes virtual display dimensions for a given aspect ratio.
+    /// For landscape (ratio >= 1): base height 1080, compute width.
+    /// For portrait (ratio < 1): base width 1080, compute height.
+    /// Dimensions are rounded to the nearest even number.
+    private func displayDimensions(for ratio: CGFloat) -> (Int, Int) {
+        if ratio >= 1.0 {
+            let height = 1080
+            let width = Int(round(CGFloat(height) * ratio / 2.0)) * 2
+            return (width, height)
+        } else {
+            let width = 1080
+            let height = Int(round(CGFloat(width) / ratio / 2.0)) * 2
+            return (width, height)
         }
     }
 

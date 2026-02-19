@@ -8,8 +8,8 @@ Ultrawide monitors are great for productivity, but screen sharing the entire dis
 
 ## How It Works
 
-1. ScreenSlice creates a virtual display (1920x1080) using the CGVirtualDisplay private API
-2. A dimming overlay appears on your screen with a resizable frame showing the shared region
+1. ScreenSlice creates a virtual display (resolution matched to aspect ratio) using the CGVirtualDisplay private API
+2. A dimming overlay appears on your screen with a resizable frame showing the shared region (dimming is adjustable)
 3. ScreenCaptureKit captures the frame region and renders it to the virtual display
 4. In your meeting app, share the "ScreenSlice" display instead of your ultrawide
 
@@ -36,10 +36,10 @@ cp -r .build/release/ScreenSlice.app /Applications/
 
 1. Launch ScreenSlice -- a `rectangle.dashed` icon appears in the menu bar
 2. Click **Start Sharing** -- a dimming overlay appears with a 4:3 frame
-3. **Move** the frame using the drag handle (white pill at the top)
+3. **Move** the frame using the drag handles (white pills at the top and bottom)
 4. **Resize** using the corner and edge handles
 5. Open your meeting app and share the **ScreenSlice** display
-6. Use the menu bar to change aspect ratio (4:3, 16:9, 16:10) or toggle audio
+6. Use the menu bar to change aspect ratio (landscape: 4:3, 16:9, 16:10 / portrait: 3:4, 9:16, 10:16), adjust dim effect, or toggle audio
 7. Click **Stop Sharing** when done
 
 ## Permissions
@@ -62,5 +62,5 @@ Use **Check Permissions** in the menu bar to verify access.
 ## Limitations
 
 - CGVirtualDisplay is a private API and may break in future macOS updates
-- The virtual display is fixed at 1920x1080 regardless of capture region size
+- The virtual display resolution adapts to the selected aspect ratio but uses a fixed base dimension (1080)
 - No code signing with a Developer ID -- TCC permissions may reset on rebuild
