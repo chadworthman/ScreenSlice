@@ -18,8 +18,11 @@ class OverlayContentView: NSView {
     /// Locked aspect ratio (width/height). Nil = free resize.
     var aspectRatio: CGFloat? = 4.0 / 3.0
 
-    /// Callback when the clear region changes (user drag/resize).
+    /// Callback when the clear region changes (user drag/resize). Fires during drag.
     var onRegionChanged: ((NSRect) -> Void)?
+
+    /// Callback when the user finishes a drag/resize (mouse-up). Use for expensive updates.
+    var onRegionFinished: ((NSRect) -> Void)?
 
     private let handleSize: CGFloat = 8.0
     private let borderWidth: CGFloat = 2.0
@@ -199,6 +202,9 @@ class OverlayContentView: NSView {
     }
 
     override func mouseUp(with event: NSEvent) {
+        if currentInteraction != .none {
+            onRegionFinished?(clearRegion)
+        }
         currentInteraction = .none
     }
 

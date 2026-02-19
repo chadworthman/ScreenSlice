@@ -66,15 +66,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         virtualDisplay.createDisplay(width: Int(captureRegion.width), height: Int(captureRegion.height))
 
         // 3. Connect frame updates from overlay to capture manager
+        // During drag: only update capture rect (lightweight)
         overlay.overlayView.onRegionChanged = { [weak self] newRegion in
             guard let self else { return }
             Task {
                 try? await self.captureManager.updateCaptureRect(newRegion)
-                self.virtualDisplay.updateResolution(
-                    width: Int(newRegion.width),
-                    height: Int(newRegion.height)
-                )
             }
+        }
+
+        // On mouse-up: update virtual display resolution (expensive, recreates display)
+        overlay.overlayView.onRegionFinished = { [weak self] newRegion in
+            guard let self else { return }
+            self.virtualDisplay.updateResolution(
+                width: Int(newRegion.width),
+                height: Int(newRegion.height)
+            )
         }
 
         // 4. Connect capture output to virtual display
@@ -120,6 +126,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
             region.origin.y = centerY - region.height / 2
             overlay.overlayView.clearRegion = region
             overlay.overlayView.onRegionChanged?(region)
+            overlay.overlayView.onRegionFinished?(region)
         }
     }
 
