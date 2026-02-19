@@ -90,11 +90,22 @@ class OverlayContentView: NSView {
         NSColor.white.withAlphaComponent(0.8).setStroke()
         borderPath.stroke()
 
-        // Resize handles
-        for rect in handleRects() {
+        // Corner resize handles (dots)
+        for rect in cornerHandleRects() {
             let handlePath = NSBezierPath(ovalIn: rect)
             NSColor.white.setFill()
             handlePath.fill()
+        }
+
+        // Edge resize handles (bars)
+        for barRect in edgeHandleRects() {
+            let radius = min(barRect.width, barRect.height) / 2
+            let barPath = NSBezierPath(roundedRect: barRect, xRadius: radius, yRadius: radius)
+            NSColor.black.withAlphaComponent(0.5).setStroke()
+            barPath.lineWidth = 1.5
+            barPath.stroke()
+            NSColor.white.withAlphaComponent(0.9).setFill()
+            barPath.fill()
         }
 
         // Drag handle bars (centered pills at top and bottom of clear region)
@@ -110,7 +121,7 @@ class OverlayContentView: NSView {
 
     // MARK: - Handle Geometry
 
-    private func handleRects() -> [NSRect] {
+    private func cornerHandleRects() -> [NSRect] {
         let r = clearRegion
         let hs = handleSize
         let half = hs / 2.0
@@ -119,10 +130,22 @@ class OverlayContentView: NSView {
             NSRect(x: r.maxX - half, y: r.maxY - half, width: hs, height: hs),
             NSRect(x: r.minX - half, y: r.minY - half, width: hs, height: hs),
             NSRect(x: r.maxX - half, y: r.minY - half, width: hs, height: hs),
-            NSRect(x: r.midX - half, y: r.maxY - half, width: hs, height: hs),
-            NSRect(x: r.midX - half, y: r.minY - half, width: hs, height: hs),
-            NSRect(x: r.minX - half, y: r.midY - half, width: hs, height: hs),
-            NSRect(x: r.maxX - half, y: r.midY - half, width: hs, height: hs),
+        ]
+    }
+
+    private func edgeHandleRects() -> [NSRect] {
+        let r = clearRegion
+        let barLen: CGFloat = 30.0
+        let barThick: CGFloat = 6.0
+        return [
+            // Top edge (horizontal bar)
+            NSRect(x: r.midX - barLen / 2, y: r.maxY - barThick / 2, width: barLen, height: barThick),
+            // Bottom edge (horizontal bar)
+            NSRect(x: r.midX - barLen / 2, y: r.minY - barThick / 2, width: barLen, height: barThick),
+            // Left edge (vertical bar)
+            NSRect(x: r.minX - barThick / 2, y: r.midY - barLen / 2, width: barThick, height: barLen),
+            // Right edge (vertical bar)
+            NSRect(x: r.maxX - barThick / 2, y: r.midY - barLen / 2, width: barThick, height: barLen),
         ]
     }
 
@@ -189,7 +212,12 @@ class OverlayContentView: NSView {
     }
 
     override func mouseDragged(with event: NSEvent) {
-        let p = convert(event.locationInWindow, from: nil)
+        let raw = convert(event.locationInWindow, from: nil)
+        // Clamp mouse to view bounds so dragging off-screen doesn't break aspect ratio
+        let p = NSPoint(
+            x: min(max(raw.x, bounds.minX), bounds.maxX),
+            y: min(max(raw.y, bounds.minY), bounds.maxY)
+        )
         let dx = p.x - mouseDownPoint.x
         let dy = p.y - mouseDownPoint.y
         var r = originalRegion
@@ -215,15 +243,25 @@ class OverlayContentView: NSView {
             r.origin.y += dy
             r.size.height -= dy
         case .resizeTop:
-            r.size.height += dy
+            let maxDy = min(bounds.maxY - r.maxY, r.minY - bounds.minY)
+            let cdy = min(dy, maxDy)
+            r.origin.y -= cdy
+            r.size.height += 2 * cdy
         case .resizeBottom:
-            r.origin.y += dy
-            r.size.height -= dy
+            let maxDy = min(bounds.maxY - r.maxY, r.minY - bounds.minY)
+            let cdy = max(dy, -maxDy)
+            r.origin.y += cdy
+            r.size.height -= 2 * cdy
         case .resizeLeft:
-            r.origin.x += dx
-            r.size.width -= dx
+            let maxDx = min(r.minX - bounds.minX, bounds.maxX - r.maxX)
+            let cdx = max(dx, -maxDx)
+            r.origin.x += cdx
+            r.size.width -= 2 * cdx
         case .resizeRight:
-            r.size.width += dx
+            let maxDx = min(r.minX - bounds.minX, bounds.maxX - r.maxX)
+            let cdx = min(dx, maxDx)
+            r.origin.x -= cdx
+            r.size.width += 2 * cdx
         case .none:
             return
         }
@@ -301,9 +339,35 @@ class OverlayContentView: NSView {
 
     private func enforceAspectRatio(_ rect: NSRect, ratio: CGFloat, interaction: Interaction) -> NSRect {
         var r = rect
+        let b = bounds
         switch interaction {
         case .resizeLeft, .resizeRight:
-            r.size.height = r.size.width / ratio
+            // Width drives height; center the height change
+            // Limit height so it stays within vertical bounds
+            let maxHeight = min(r.size.width / ratio,
+                                2 * (r.midY - b.minY),
+                                2 * (b.maxY - r.midY))
+            r.size.width = maxHeight * ratio
+            r.origin.y = originalRegion.midY - maxHeight / 2
+            r.size.height = maxHeight
+            // Re-center horizontally for the adjusted width
+            r.origin.x = originalRegion.midX - r.size.width / 2
+        case .resizeTop, .resizeBottom:
+            // Height drives width; center the width change
+            // Limit width so it stays within horizontal bounds
+            let maxWidth = min(r.size.height * ratio,
+                               2 * (r.midX - b.minX),
+                               2 * (b.maxX - r.midX))
+            r.size.height = maxWidth / ratio
+            r.origin.x = originalRegion.midX - maxWidth / 2
+            r.size.width = maxWidth
+            // Re-center vertically for the adjusted height
+            r.origin.y = originalRegion.midY - r.size.height / 2
+        case .resizeTopLeft, .resizeBottomLeft:
+            // Height drives width; anchor the right edge
+            let newWidth = r.size.height * ratio
+            r.origin.x = originalRegion.maxX - newWidth
+            r.size.width = newWidth
         default:
             r.size.width = r.size.height * ratio
         }
