@@ -5,9 +5,15 @@ let package = Package(
     name: "ScreenSlice",
     platforms: [.macOS(.v15)],
     targets: [
+        .target(
+            name: "CGVirtualDisplayPrivate",
+            path: "ScreenSlice/CGVirtualDisplayPrivate",
+            publicHeadersPath: "."
+        ),
         .executableTarget(
             name: "ScreenSlice",
-            path: "ScreenSlice",
+            dependencies: ["CGVirtualDisplayPrivate"],
+            path: "ScreenSlice/Sources",
             exclude: ["Info.plist"]
         ),
     ]
