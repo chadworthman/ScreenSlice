@@ -36,8 +36,8 @@ cp -r .build/release/ScreenSlice.app /Applications/
 
 1. Launch ScreenSlice -- a `rectangle.dashed` icon appears in the menu bar
 2. Click **Start Sharing** -- a dimming overlay appears with a 4:3 frame
-3. **Move** the frame using the drag handles (white pills at the top and bottom)
-4. **Resize** using the corner and edge handles
+3. **Move** the frame using the drag bars (white pills at the top and bottom)
+4. **Resize** using the corner handles (dots) or edge handles (bars) -- edge resizing keeps the frame centered, corner resizing anchors the opposite corner
 5. Open your meeting app and share the **ScreenSlice** display
 6. Use the menu bar to change aspect ratio (landscape: 4:3, 16:9, 16:10 / portrait: 3:4, 9:16, 10:16), adjust dim effect, or toggle audio
 7. Click **Stop Sharing** when done

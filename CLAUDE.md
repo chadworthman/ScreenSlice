@@ -8,13 +8,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 swift build                    # Debug build
 swift build -c release         # Release build
 ./scripts/build-app.sh         # Release build + .app bundle + codesign
+./scripts/rebuild.sh           # Reset TCC + build + launch
 ```
 
-The build script outputs to `.build/release/ScreenSlice.app`. No test suite exists; testing is manual (launch app, verify sharing lifecycle, test in Zoom/Meet).
+The build script outputs to `.build/release/ScreenSlice.app`. `rebuild.sh` resets Screen Recording permissions (stale after re-codesign), builds, and launches in one step. No test suite exists; testing is manual (launch app, verify sharing lifecycle, test in Zoom/Meet).
 
 ## Architecture
 
-ScreenSlice is a macOS menu bar app (~985 lines of Swift) that captures a user-selected screen region and presents it as a virtual display for screen sharing. It uses Swift Package Manager with two targets:
+ScreenSlice is a macOS menu bar app (~1150 lines of Swift) that captures a user-selected screen region and presents it as a virtual display for screen sharing. It uses Swift Package Manager with two targets:
 
 - **CGVirtualDisplayPrivate** — C target bridging Apple's private `CGVirtualDisplay` API via an Objective-C header
 - **ScreenSlice** — The executable, depending on the above
@@ -39,7 +40,7 @@ MenuBar (start) → AppDelegate orchestrates →
 | `VirtualDisplayManager.swift` | Creates CGVirtualDisplay, renders IOSurface frames to a window on it |
 | `ScreenCaptureManager.swift` | SCStream setup, coordinate conversion (NSScreen↔CoreGraphics), capture rect updates |
 | `OverlayWindow.swift` | Borderless always-on-top transparent window |
-| `OverlayContentView.swift` | Even-odd fill dimming, 8 resize handles, top + bottom drag bars, aspect ratio enforcement |
+| `OverlayContentView.swift` | Even-odd fill dimming, corner dot handles, edge bar handles (centered resize), top + bottom drag bars, aspect ratio enforcement with bounds clamping |
 
 ### Critical Patterns
 
@@ -59,7 +60,7 @@ MenuBar (start) → AppDelegate orchestrates →
 
 ## Conventions
 
-- Logging: `ssLog()` writes to both `NSLog` and `~/ScreenSlice.log` (cleared on launch)
+- Logging: `ssLog()` writes to `NSLog` (viewable via Console.app)
 - App runs as `.accessory` activation policy (menu bar only, no Dock icon)
 - Virtual display resolution matches capture aspect ratio (e.g. 4:3 → 1440×1080, 16:9 → 1920×1080, 3:4 → 1080×1440)
 - Ad-hoc codesigning only (no Developer ID) — TCC permissions reset on rebuild
