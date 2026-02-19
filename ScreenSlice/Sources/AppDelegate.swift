@@ -1,22 +1,8 @@
 import Cocoa
 import ScreenCaptureKit
 
-private let logFile: URL = {
-    let url = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("ScreenSlice.log")
-    // Clear log on launch
-    try? "".write(to: url, atomically: true, encoding: .utf8)
-    return url
-}()
-
 func ssLog(_ message: String) {
-    let line = "\(Date()): \(message)\n"
     NSLog("ScreenSlice: %@", message)
-    if let data = line.data(using: .utf8),
-       let handle = try? FileHandle(forWritingTo: logFile) {
-        handle.seekToEndOfFile()
-        handle.write(data)
-        handle.closeFile()
-    }
 }
 
 @MainActor
