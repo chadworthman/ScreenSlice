@@ -233,6 +233,9 @@ class OverlayContentView: NSView {
             r = enforceAspectRatio(r, ratio: ratio, interaction: currentInteraction)
         }
 
+        // Clamp to display bounds
+        r = clampToDisplay(r)
+
         // Enforce minimum size
         if r.width >= 200 && r.height >= 150 {
             clearRegion = r
@@ -269,6 +272,29 @@ class OverlayContentView: NSView {
     override func hitTest(_ point: NSPoint) -> NSView? {
         let p = convert(point, from: superview)
         return interactionAt(p) != .none ? self : nil
+    }
+
+    // MARK: - Display Bounds
+
+    private func clampToDisplay(_ rect: NSRect) -> NSRect {
+        var r = rect
+        let b = bounds
+
+        // For move: shift back inside bounds
+        if currentInteraction == .move {
+            if r.minX < b.minX { r.origin.x = b.minX }
+            if r.minY < b.minY { r.origin.y = b.minY }
+            if r.maxX > b.maxX { r.origin.x = b.maxX - r.width }
+            if r.maxY > b.maxY { r.origin.y = b.maxY - r.height }
+        } else {
+            // For resize: clamp edges to bounds
+            if r.minX < b.minX { r.size.width -= (b.minX - r.minX); r.origin.x = b.minX }
+            if r.minY < b.minY { r.size.height -= (b.minY - r.minY); r.origin.y = b.minY }
+            if r.maxX > b.maxX { r.size.width = b.maxX - r.origin.x }
+            if r.maxY > b.maxY { r.size.height = b.maxY - r.origin.y }
+        }
+
+        return r
     }
 
     // MARK: - Aspect Ratio
