@@ -14,6 +14,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
 
     private var isSharing = false
     private var currentAspectRatio: CGFloat = 4.0 / 3.0
+    private var currentPresetIndex: Int = 0
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -28,8 +29,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
             }
         }
 
-        menuBar.onAspectRatioChanged = { [weak self] ratio in
-            self?.changeAspectRatio(ratio)
+        menuBar.onAspectRatioChanged = { [weak self] ratio, presetIndex in
+            self?.changeAspectRatio(ratio, presetIndex: presetIndex)
         }
 
         menuBar.onDimOpacityChanged = { [weak self] opacity in
@@ -171,7 +172,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         menuBar.updateSharingState(false)
     }
 
-    private func changeAspectRatio(_ ratio: CGFloat) {
+    private func changeAspectRatio(_ ratio: CGFloat, presetIndex: Int) {
+        // Warn user if sharing is active — changing aspect ratio recreates the
+        // virtual display with a new ID, which disconnects meeting apps.
+        if isSharing {
+            let alert = NSAlert()
+            alert.messageText = "Change Aspect Ratio?"
+            alert.informativeText = "Changing the aspect ratio while sharing will stop the current screen share. You'll need to re-select the ScreenSlice display in your meeting app.\n\nDo you want to continue?"
+            alert.addButton(withTitle: "Change Aspect Ratio")
+            alert.addButton(withTitle: "Cancel")
+            alert.alertStyle = .warning
+            if alert.runModal() != .alertFirstButtonReturn {
+                menuBar.revertPreset(to: currentPresetIndex)
+                return
+            }
+        }
+
+        currentPresetIndex = presetIndex
         currentAspectRatio = ratio
         overlayWindow?.overlayView.aspectRatio = ratio
 

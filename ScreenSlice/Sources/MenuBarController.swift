@@ -9,7 +9,7 @@ class MenuBarController {
     private var aspectRatioItems: [NSMenuItem] = []
 
     var onStartStop: (() -> Void)?
-    var onAspectRatioChanged: ((CGFloat) -> Void)?
+    var onAspectRatioChanged: ((_ ratio: CGFloat, _ presetIndex: Int) -> Void)?
     var onAudioToggled: ((Bool) -> Void)?
     var onDimOpacityChanged: ((CGFloat) -> Void)?
     var onCheckPermissions: (() -> Void)?
@@ -132,10 +132,21 @@ class MenuBarController {
 
     @objc private func selectAspectRatio(_ sender: NSMenuItem) {
         selectedPresetIndex = sender.tag
+        updateCheckmarks()
+        onAspectRatioChanged?(presets[selectedPresetIndex].ratio, selectedPresetIndex)
+    }
+
+    /// Reverts the selected preset to the given index and updates checkmarks.
+    func revertPreset(to index: Int) {
+        guard index >= 0 && index < presets.count else { return }
+        selectedPresetIndex = index
+        updateCheckmarks()
+    }
+
+    private func updateCheckmarks() {
         for (index, item) in aspectRatioItems.enumerated() {
             item.state = index == selectedPresetIndex ? .on : .off
         }
-        onAspectRatioChanged?(presets[selectedPresetIndex].ratio)
     }
 
     @objc private func toggleAudio() {
